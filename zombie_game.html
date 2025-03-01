@@ -70,7 +70,7 @@
         
         // Game variables
         let scene, camera, renderer;
-        let player, zombies = [], weapons = [], trees = [];
+        let player, zombies = [], weapons = [], trees = [], bullets = [];
         let keys = {};
         let gameRunning = false;
         let playerHealth = 100;
@@ -158,6 +158,7 @@
                 // Update game state
                 updatePlayer();
                 updateZombies();
+                updateBullets();
                 checkCollisions();
                 checkWeaponPickup();
                 
@@ -181,6 +182,10 @@
             
             weapons.forEach(weapon => scene.remove(weapon));
             weapons = [];
+            
+            // Clear existing bullets from previous game
+            bullets.forEach(bullet => scene.remove(bullet));
+            bullets = [];
             
             // Clear renderer if it exists from previous game
             if (renderer && renderer.domElement && renderer.domElement.parentNode) {
@@ -449,38 +454,69 @@
                     console.log("Hit zombie with bat!");
                 }
             } else if (currentWeapon === 'pistol') {
-                // Ranged attack - check for zombies in line of sight
-                const attackRange = 15;
+                // Create and fire a bullet
+                createBullet();
+            }
+        }
+
+        // Create a bullet
+        function createBullet() {
+            // Create bullet geometry
+            const geometry = new THREE.SphereGeometry(0.1, 8, 8);
+            const material = new THREE.MeshBasicMaterial({ color: 0xFFFF00 }); // Yellow bullet
+            const bullet = new THREE.Mesh(geometry, material);
+            
+            // Set bullet position to start from player position (slightly elevated)
+            bullet.position.copy(player.position);
+            bullet.position.y = 1; // Bullet height
+            
+            // Calculate bullet direction (player's forward direction)
+            const direction = new THREE.Vector3(0, 0, -1);
+            direction.applyQuaternion(player.quaternion);
+            
+            // Store direction and other properties on bullet
+            bullet.direction = direction;
+            bullet.speed = 0.5; // Bullet speed
+            bullet.damage = 50; // Bullet damage
+            bullet.maxDistance = 15; // Maximum travel distance
+            bullet.distanceTraveled = 0; // Track distance traveled
+            
+            // Add bullet to scene and bullets array
+            scene.add(bullet);
+            bullets.push(bullet);
+            
+            return bullet;
+        }
+
+        // Update bullets positions and check for hits
+        function updateBullets() {
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                const bullet = bullets[i];
                 
-                // Get player's forward direction
-                const playerDirection = new THREE.Vector3(0, 0, -1);
-                playerDirection.applyQuaternion(player.quaternion);
+                // Move bullet in its direction
+                bullet.position.x += bullet.direction.x * bullet.speed;
+                bullet.position.z += bullet.direction.z * bullet.speed;
                 
-                // Find closest zombie in front of player
-                let closestZombie = null;
-                let closestDistance = attackRange;
+                // Update distance traveled
+                bullet.distanceTraveled += bullet.speed;
                 
-                for (let zombie of zombies) {
-                    const distance = player.position.distanceTo(zombie.position);
+                // Check if bullet hit any zombie
+                let hitZombie = false;
+                for (let j = zombies.length - 1; j >= 0; j--) {
+                    const zombie = zombies[j];
+                    const distance = bullet.position.distanceTo(zombie.position);
                     
-                    if (distance < closestDistance) {
-                        // Calculate vector from player to zombie
-                        const toZombie = zombie.position.clone().sub(player.position).normalize();
-                        
-                        // Calculate dot product to check if zombie is in front of player
-                        const dotProduct = playerDirection.dot(toZombie);
-                        
-                        // If zombie is roughly in front of player (within ~45 degrees)
-                        if (dotProduct > 0.7) {
-                            closestZombie = zombie;
-                            closestDistance = distance;
-                        }
+                    if (distance < 1) { // Hit if within 1 unit
+                        damageZombie(zombie, bullet.damage);
+                        hitZombie = true;
+                        break;
                     }
                 }
                 
-                if (closestZombie) {
-                    damageZombie(closestZombie, 50);
-                    console.log("Shot zombie with pistol!");
+                // Remove bullet if it hit a zombie or traveled max distance
+                if (hitZombie || bullet.distanceTraveled >= bullet.maxDistance) {
+                    scene.remove(bullet);
+                    bullets.splice(i, 1);
                 }
             }
         }
@@ -497,7 +533,15 @@
                 zombie.material.color.copy(originalColor);
             }, 100);
             
+            // Create or update health bar for zombie
+            showZombieHealthBar(zombie);
+            
             if (zombie.health <= 0) {
+                // Remove zombie health bar if it exists
+                if (zombie.healthBar) {
+                    scene.remove(zombie.healthBar);
+                }
+                
                 // Remove zombie from scene and array
                 scene.remove(zombie);
                 const index = zombies.indexOf(zombie);
@@ -510,6 +554,67 @@
                     victory();
                 }
             }
+        }
+
+        // Show zombie health bar
+        function showZombieHealthBar(zombie) {
+            // Remove existing health bar if it exists
+            if (zombie.healthBar) {
+                scene.remove(zombie.healthBar);
+            }
+            
+            // Create health bar container
+            const barWidth = 1;
+            const barHeight = 0.1;
+            const geometry = new THREE.BoxGeometry(barWidth, barHeight, 0.01);
+            const material = new THREE.MeshBasicMaterial({ color: 0x333333 }); // Dark gray background
+            const healthBar = new THREE.Mesh(geometry, material);
+            
+            // Create health fill based on zombie's current health percentage
+            const healthPercent = zombie.health / 100;
+            const fillWidth = barWidth * healthPercent;
+            const fillGeometry = new THREE.BoxGeometry(fillWidth, barHeight, 0.02);
+            
+            // Color based on health level
+            let fillColor;
+            if (healthPercent > 0.6) {
+                fillColor = 0x4CAF50; // Green
+            } else if (healthPercent > 0.3) {
+                fillColor = 0xFFC107; // Yellow
+            } else {
+                fillColor = 0xF44336; // Red
+            }
+            
+            const fillMaterial = new THREE.MeshBasicMaterial({ color: fillColor });
+            const healthFill = new THREE.Mesh(fillGeometry, fillMaterial);
+            
+            // Position fill at left side of bar
+            healthFill.position.x = (barWidth - fillWidth) / 2 * -1;
+            
+            // Add fill to health bar
+            healthBar.add(healthFill);
+            
+            // Position health bar above zombie
+            healthBar.position.copy(zombie.position);
+            healthBar.position.y = 3; // Position above zombie
+            
+            // Add health bar to scene
+            scene.add(healthBar);
+            
+            // Store reference to health bar on zombie
+            zombie.healthBar = healthBar;
+            
+            // Clear health bar after 3 seconds
+            if (zombie.healthBarTimeout) {
+                clearTimeout(zombie.healthBarTimeout);
+            }
+            
+            zombie.healthBarTimeout = setTimeout(() => {
+                if (zombie.healthBar) {
+                    scene.remove(zombie.healthBar);
+                    zombie.healthBar = null;
+                }
+            }, 3000);
         }
 
         // Create a zombie
@@ -530,6 +635,8 @@
             zombie.speed = 0.05;
             zombie.health = 100;
             zombie.lastAttackTime = 0; // Track when zombie last attacked
+            zombie.healthBar = null; // Reference to health bar
+            zombie.healthBarTimeout = null; // Timeout for hiding health bar
             
             scene.add(zombie);
             zombies.push(zombie);
