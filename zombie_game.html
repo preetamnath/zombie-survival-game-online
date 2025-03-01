@@ -104,6 +104,11 @@
             createGround();
             createPlayer();
             
+            // Create trees
+            for (let i = 0; i < 15; i++) {
+                createTree();
+            }
+            
             // Create zombies
             for (let i = 0; i < 8; i++) {
                 createZombie();
@@ -174,6 +179,37 @@
             return ground;
         }
 
+        // Create a tree
+        function createTree() {
+            // Tree trunk (cylinder)
+            const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.5, 4, 8);
+            const trunkMaterial = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown
+            const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+            
+            // Tree top (cone)
+            const topGeometry = new THREE.ConeGeometry(2, 4, 8);
+            const topMaterial = new THREE.MeshBasicMaterial({ color: 0x228B22 }); // Forest green
+            const top = new THREE.Mesh(topGeometry, topMaterial);
+            top.position.y = 4; // Position on top of trunk
+            
+            // Create tree group
+            const tree = new THREE.Group();
+            tree.add(trunk);
+            tree.add(top);
+            
+            // Random position within map boundaries
+            const halfMapSize = MAP_SIZE / 2 - 2; // Keep trees away from edges
+            tree.position.set(
+                Math.random() * halfMapSize * 2 - halfMapSize,
+                0, // Base at ground level
+                Math.random() * halfMapSize * 2 - halfMapSize
+            );
+            
+            scene.add(tree);
+            trees.push(tree);
+            return tree;
+        }
+
         // Create the player
         function createPlayer() {
             // Using a slightly taller box to represent a person
@@ -195,35 +231,55 @@
         // Update player position based on keyboard input
         function updatePlayer() {
             const playerSpeed = 0.1; // Movement speed constant
+            const newPosition = player.position.clone(); // Create a copy of current position
             
             // Forward/backward movement (Z axis)
             if (keys['KeyW']) {
-                player.position.z -= playerSpeed;
+                newPosition.z -= playerSpeed;
             }
             if (keys['KeyS']) {
-                player.position.z += playerSpeed;
+                newPosition.z += playerSpeed;
             }
             
             // Left/right movement (X axis)
             if (keys['KeyA']) {
-                player.position.x -= playerSpeed;
+                newPosition.x -= playerSpeed;
             }
             if (keys['KeyD']) {
-                player.position.x += playerSpeed;
+                newPosition.x += playerSpeed;
             }
             
             // Enforce map boundaries
             const halfMapSize = MAP_SIZE / 2;
             const boundaryLimit = halfMapSize - 1; // Keep player 1 unit away from edge
             
-            player.position.x = Math.max(-boundaryLimit, Math.min(boundaryLimit, player.position.x));
-            player.position.z = Math.max(-boundaryLimit, Math.min(boundaryLimit, player.position.z));
+            newPosition.x = Math.max(-boundaryLimit, Math.min(boundaryLimit, newPosition.x));
+            newPosition.z = Math.max(-boundaryLimit, Math.min(boundaryLimit, newPosition.z));
+            
+            // Check for tree collisions before applying movement
+            if (!checkTreeCollisions(newPosition)) {
+                player.position.copy(newPosition);
+            }
             
             // Update camera to follow player
             camera.position.set(player.position.x, 10, player.position.z + 15);
             camera.lookAt(player.position);
             
             return player.position;
+        }
+
+        // Check for collisions between player and trees
+        function checkTreeCollisions(newPosition) {
+            const collisionThreshold = 2.5; // Distance threshold for tree collision
+            
+            for (let tree of trees) {
+                const distance = newPosition.distanceTo(tree.position);
+                if (distance < collisionThreshold) {
+                    return true; // Collision detected
+                }
+            }
+            
+            return false; // No collision
         }
 
         // Create a zombie
@@ -263,12 +319,32 @@
                     // Calculate direction vector from zombie to player
                     const direction = player.position.clone().sub(zombie.position).normalize();
                     
-                    // Move zombie toward player
-                    zombie.position.x += direction.x * zombie.speed;
-                    zombie.position.z += direction.z * zombie.speed;
+                    // Calculate new position
+                    const newPosition = zombie.position.clone();
+                    newPosition.x += direction.x * zombie.speed;
+                    newPosition.z += direction.z * zombie.speed;
+                    
+                    // Check for tree collisions before moving
+                    if (!checkZombieTreeCollisions(newPosition)) {
+                        zombie.position.copy(newPosition);
+                    }
                 }
                 // Zombies outside detection radius remain stationary
             });
+        }
+
+        // Check for collisions between zombie and trees
+        function checkZombieTreeCollisions(newPosition) {
+            const collisionThreshold = 2.5; // Distance threshold for tree collision
+            
+            for (let tree of trees) {
+                const distance = newPosition.distanceTo(tree.position);
+                if (distance < collisionThreshold) {
+                    return true; // Collision detected
+                }
+            }
+            
+            return false; // No collision
         }
 
         // Check for collisions between player and zombies
