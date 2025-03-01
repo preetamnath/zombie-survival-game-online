@@ -83,7 +83,6 @@
             
             // Create camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            setupCamera(); // Set initial camera position
             
             // Create renderer
             renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -101,14 +100,19 @@
             // Setup event listeners for keyboard input
             setupEventListeners();
             
-            // Create ground and player
+            // Create ground and trees first
             createGround();
-            createPlayer();
             
             // Create trees
             for (let i = 0; i < 15; i++) {
                 createTree();
             }
+            
+            // Create player after trees
+            createPlayer();
+            
+            // Setup camera after player is created
+            setupCamera();
             
             // Create weapons
             createWeapon('bat', new THREE.Vector3(5, 0.5, 5));
@@ -241,7 +245,40 @@
             const geometry = new THREE.BoxGeometry(1, 2, 1); // Width, height, depth
             const material = new THREE.MeshBasicMaterial({ color: 0x1E88E5 });
             player = new THREE.Mesh(geometry, material);
-            player.position.set(0, 1, 0); // Position player at half height above ground
+            
+            // Find a clear spawn position
+            let validPosition = false;
+            let attempts = 0;
+            const maxAttempts = 50;
+            
+            // Default position
+            let position = new THREE.Vector3(0, 1, 0);
+            
+            // Try to find a clear position
+            while (!validPosition && attempts < maxAttempts) {
+                // Try a random position if first attempt fails
+                if (attempts > 0) {
+                    const halfMapSize = MAP_SIZE / 2 - 5;
+                    position = new THREE.Vector3(
+                        Math.random() * halfMapSize * 2 - halfMapSize,
+                        1,
+                        Math.random() * halfMapSize * 2 - halfMapSize
+                    );
+                }
+                
+                // Check if position is clear of trees
+                validPosition = true;
+                for (let tree of trees) {
+                    if (position.distanceTo(tree.position) < 3) {
+                        validPosition = false;
+                        break;
+                    }
+                }
+                
+                attempts++;
+            }
+            
+            player.position.copy(position);
             player.health = 100; // Initialize player health
             scene.add(player);
             return player;
