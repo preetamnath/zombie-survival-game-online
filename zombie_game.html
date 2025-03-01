@@ -126,6 +126,7 @@
             // Update game state
             updatePlayer();
             updateZombies();
+            checkCollisions();
             
             renderer.render(scene, camera);
         }
@@ -237,6 +238,20 @@
                 // Move zombie toward player
                 zombie.position.x += direction.x * zombie.speed;
                 zombie.position.z += direction.z * zombie.speed;
+            });
+        }
+
+        // Check for collisions between player and zombies
+        function checkCollisions() {
+            const collisionThreshold = 1.5; // Distance threshold for collision
+            
+            zombies.forEach(zombie => {
+                const distance = player.position.distanceTo(zombie.position);
+                
+                if (distance < collisionThreshold) {
+                    console.log("Collision!");
+                    // This will be replaced with actual attack logic later
+                }
             });
         }
     </script>
