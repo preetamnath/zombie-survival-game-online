@@ -98,6 +98,10 @@
             
             // Setup event listeners for keyboard input
             setupEventListeners();
+            
+            // Create ground and player
+            createGround();
+            createPlayer();
         }
         
         // Setup event listeners
@@ -128,6 +132,29 @@
         
         // Add event listener to start button
         document.getElementById('startButton').addEventListener('click', startGame);
+
+        // Create the ground
+        function createGround() {
+            const geometry = new THREE.PlaneGeometry(MAP_SIZE, MAP_SIZE);
+            const material = new THREE.MeshBasicMaterial({ color: 0x4CAF50, side: THREE.DoubleSide });
+            const ground = new THREE.Mesh(geometry, material);
+            ground.rotation.x = -Math.PI / 2; // Rotate to be horizontal
+            ground.position.y = 0;
+            scene.add(ground);
+            return ground;
+        }
+
+        // Create the player
+        function createPlayer() {
+            // Using a slightly taller box to represent a person
+            const geometry = new THREE.BoxGeometry(1, 2, 1); // Width, height, depth
+            const material = new THREE.MeshBasicMaterial({ color: 0x1E88E5 });
+            player = new THREE.Mesh(geometry, material);
+            player.position.set(0, 1, 0); // Position player at half height above ground
+            player.health = 100; // Initialize player health
+            scene.add(player);
+            return player;
+        }
     </script>
 </body>
 </html> 
