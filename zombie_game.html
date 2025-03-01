@@ -72,6 +72,8 @@
         let scene, camera, renderer;
         let player, zombies = [], weapons = [], trees = [];
         let keys = {};
+        let gameRunning = false;
+        let playerHealth = 100;
         
         // Initialize the game
         function init() {
@@ -121,20 +123,29 @@
         
         // Animation loop
         function animate() {
-            requestAnimationFrame(animate);
-            
-            // Update game state
-            updatePlayer();
-            updateZombies();
-            checkCollisions();
-            
-            renderer.render(scene, camera);
+            if (gameRunning) {
+                requestAnimationFrame(animate);
+                
+                // Update game state
+                updatePlayer();
+                updateZombies();
+                checkCollisions();
+                
+                renderer.render(scene, camera);
+            }
         }
         
         // Start the game
         function startGame() {
             document.getElementById('startButton').style.display = 'none';
             document.getElementById('healthBar').style.display = 'block';
+            
+            // Reset player health
+            playerHealth = 100;
+            updateHealthBar();
+            
+            // Set game as running
+            gameRunning = true;
             
             init();
             animate();
@@ -249,10 +260,52 @@
                 const distance = player.position.distanceTo(zombie.position);
                 
                 if (distance < collisionThreshold) {
-                    console.log("Collision!");
-                    // This will be replaced with actual attack logic later
+                    zombieAttack(zombie);
                 }
             });
+        }
+
+        // Add this function:
+        function zombieAttack(zombie) {
+            playerHealth -= 5;
+            console.log("Player health:", playerHealth);
+            updateHealthBar();
+            
+            if (playerHealth <= 0) {
+                gameOver();
+            }
+        }
+
+        // Add this function:
+        function updateHealthBar() {
+            const healthFill = document.getElementById('healthFill');
+            healthFill.style.width = playerHealth + '%';
+            
+            // Change color based on health
+            if (playerHealth > 60) {
+                healthFill.style.backgroundColor = '#4CAF50'; // Green
+            } else if (playerHealth > 30) {
+                healthFill.style.backgroundColor = '#FFC107'; // Yellow
+            } else {
+                healthFill.style.backgroundColor = '#F44336'; // Red
+            }
+        }
+
+        // Add this function:
+        function gameOver() {
+            console.log("Game Over!");
+            gameRunning = false;
+            
+            // Show game over message
+            const gameMessages = document.getElementById('gameMessages');
+            gameMessages.textContent = "GAME OVER";
+            gameMessages.style.display = 'block';
+            
+            // Show start button again
+            setTimeout(() => {
+                document.getElementById('startButton').style.display = 'block';
+                gameMessages.style.display = 'none';
+            }, 2000);
         }
     </script>
 </body>
