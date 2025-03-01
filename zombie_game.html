@@ -144,6 +144,15 @@
             playerHealth = 100;
             updateHealthBar();
             
+            // Clear existing zombies from previous game
+            zombies.forEach(zombie => scene.remove(zombie));
+            zombies = [];
+            
+            // Clear renderer if it exists from previous game
+            if (renderer && renderer.domElement && renderer.domElement.parentNode) {
+                renderer.domElement.parentNode.removeChild(renderer.domElement);
+            }
+            
             // Set game as running
             gameRunning = true;
             
