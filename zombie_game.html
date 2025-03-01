@@ -676,6 +676,9 @@
             zombie.lastAttackTime = 0; // Track when zombie last attacked
             zombie.healthBar = null; // Reference to health bar
             zombie.healthBarTimeout = null; // Timeout for hiding health bar
+            zombie.isChasing = false; // Initially not chasing
+            zombie.normalColor = new THREE.Color(0xFF0000); // Red when idle
+            zombie.chasingColor = new THREE.Color(0x8B0000); // Dark red when chasing
             
             scene.add(zombie);
             zombies.push(zombie);
@@ -709,6 +712,20 @@
                             zombie.healthBar.position.copy(zombie.position);
                             zombie.healthBar.position.y = 3; // Position above zombie
                         }
+                    }
+                    
+                    // Mark zombie as actively chasing
+                    if (!zombie.isChasing) {
+                        zombie.isChasing = true;
+                        zombie.material.color.copy(zombie.chasingColor);
+                        console.log("Zombie detected player and started chasing!");
+                    }
+                } else {
+                    // Player is outside detection radius, stop chasing
+                    if (zombie.isChasing) {
+                        zombie.isChasing = false;
+                        zombie.material.color.copy(zombie.normalColor);
+                        console.log("Zombie lost sight of player and stopped chasing.");
                     }
                 }
                 // Zombies outside detection radius remain stationary
