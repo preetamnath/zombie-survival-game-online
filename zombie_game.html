@@ -243,6 +243,7 @@
             // Zombie properties
             zombie.speed = 0.05;
             zombie.health = 100;
+            zombie.lastAttackTime = 0; // Track when zombie last attacked
             
             scene.add(zombie);
             zombies.push(zombie);
@@ -274,14 +275,23 @@
             });
         }
 
-        // Add this function:
+        // Modify zombieAttack function
         function zombieAttack(zombie) {
-            playerHealth -= 5;
-            console.log("Player health:", playerHealth);
-            updateHealthBar();
+            const currentTime = Date.now();
+            const cooldownPeriod = 1000; // 1 second cooldown
             
-            if (playerHealth <= 0) {
-                gameOver();
+            // Check if enough time has passed since last attack
+            if (currentTime - zombie.lastAttackTime >= cooldownPeriod) {
+                playerHealth -= 5;
+                console.log("Player health:", playerHealth);
+                updateHealthBar();
+                
+                // Update last attack time
+                zombie.lastAttackTime = currentTime;
+                
+                if (playerHealth <= 0) {
+                    gameOver();
+                }
             }
         }
 
