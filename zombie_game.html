@@ -107,17 +107,21 @@
         // Setup event listeners
         function setupEventListeners() {
             document.addEventListener('keydown', (event) => {
-                keys[event.key.toLowerCase()] = true;
+                keys[event.code] = true;
             });
             
             document.addEventListener('keyup', (event) => {
-                keys[event.key.toLowerCase()] = false;
+                keys[event.code] = false;
             });
         }
         
         // Animation loop
         function animate() {
             requestAnimationFrame(animate);
+            
+            // Update game state
+            updatePlayer();
+            
             renderer.render(scene, camera);
         }
         
@@ -154,6 +158,36 @@
             player.health = 100; // Initialize player health
             scene.add(player);
             return player;
+        }
+
+        // Update player position based on keyboard input
+        function updatePlayer() {
+            const playerSpeed = 0.1; // Movement speed constant
+            
+            // Forward/backward movement (Z axis)
+            if (keys['KeyW']) {
+                player.position.z -= playerSpeed;
+            }
+            if (keys['KeyS']) {
+                player.position.z += playerSpeed;
+            }
+            
+            // Left/right movement (X axis)
+            if (keys['KeyA']) {
+                player.position.x -= playerSpeed;
+            }
+            if (keys['KeyD']) {
+                player.position.x += playerSpeed;
+            }
+            
+            // Enforce map boundaries
+            const halfMapSize = MAP_SIZE / 2;
+            const boundaryLimit = halfMapSize - 1; // Keep player 1 unit away from edge
+            
+            player.position.x = Math.max(-boundaryLimit, Math.min(boundaryLimit, player.position.x));
+            player.position.z = Math.max(-boundaryLimit, Math.min(boundaryLimit, player.position.z));
+            
+            return player.position;
         }
     </script>
 </body>
