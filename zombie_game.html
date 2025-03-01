@@ -74,6 +74,7 @@
         let keys = {};
         let gameRunning = false;
         let playerHealth = 100;
+        let currentWeapon = 'none'; // Track player's current weapon
         
         // Initialize the game
         function init() {
@@ -109,6 +110,10 @@
                 createTree();
             }
             
+            // Create weapons
+            createWeapon('bat', new THREE.Vector3(5, 0.5, 5));
+            createWeapon('pistol', new THREE.Vector3(-5, 0.5, -5));
+            
             // Create zombies
             for (let i = 0; i < 8; i++) {
                 createZombie();
@@ -124,6 +129,21 @@
             document.addEventListener('keyup', (event) => {
                 keys[event.code] = false;
             });
+            
+            // Add mouse click for attack
+            renderer.domElement.addEventListener('click', (event) => {
+                if (currentWeapon !== 'none') {
+                    playerAttack();
+                }
+            });
+            
+            // Add touch support for touchpads/touchscreens with passive: false
+            renderer.domElement.addEventListener('touchstart', (event) => {
+                if (currentWeapon !== 'none') {
+                    playerAttack();
+                    event.preventDefault(); // Prevent default touch behavior
+                }
+            }, { passive: false });
         }
         
         // Animation loop
@@ -135,6 +155,7 @@
                 updatePlayer();
                 updateZombies();
                 checkCollisions();
+                checkWeaponPickup();
                 
                 renderer.render(scene, camera);
             }
@@ -145,13 +166,17 @@
             document.getElementById('startButton').style.display = 'none';
             document.getElementById('healthBar').style.display = 'block';
             
-            // Reset player health
+            // Reset player health and weapon
             playerHealth = 100;
+            currentWeapon = 'none';
             updateHealthBar();
             
-            // Clear existing zombies from previous game
+            // Clear existing zombies and weapons from previous game
             zombies.forEach(zombie => scene.remove(zombie));
             zombies = [];
+            
+            weapons.forEach(weapon => scene.remove(weapon));
+            weapons = [];
             
             // Clear renderer if it exists from previous game
             if (renderer && renderer.domElement && renderer.domElement.parentNode) {
@@ -282,6 +307,174 @@
             return false; // No collision
         }
 
+        // Create a weapon
+        function createWeapon(type, position) {
+            let weapon;
+            
+            if (type === 'bat') {
+                // Create a simple bat (elongated box)
+                const geometry = new THREE.BoxGeometry(0.3, 1.5, 0.3);
+                const material = new THREE.MeshBasicMaterial({ color: 0x8B4513 }); // Brown
+                weapon = new THREE.Mesh(geometry, material);
+            } else if (type === 'pistol') {
+                // Create a simple pistol (L-shaped boxes)
+                const gunGroup = new THREE.Group();
+                
+                // Gun barrel
+                const barrelGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.8);
+                const barrelMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 }); // Dark gray
+                const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
+                barrel.position.z = -0.2;
+                
+                // Gun handle
+                const handleGeometry = new THREE.BoxGeometry(0.2, 0.6, 0.2);
+                const handleMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 }); // Dark gray
+                const handle = new THREE.Mesh(handleGeometry, handleMaterial);
+                handle.position.y = -0.3;
+                
+                gunGroup.add(barrel);
+                gunGroup.add(handle);
+                weapon = gunGroup;
+            }
+            
+            // Set weapon properties
+            weapon.position.copy(position);
+            weapon.type = type;
+            weapon.damage = type === 'bat' ? 25 : 50; // Pistol does more damage
+            weapon.range = type === 'bat' ? 2 : 15; // Pistol has longer range
+            
+            scene.add(weapon);
+            weapons.push(weapon);
+            return weapon;
+        }
+
+        // Check if player can pick up a weapon
+        function checkWeaponPickup() {
+            const pickupThreshold = 1.5; // Distance threshold for pickup
+            
+            for (let i = weapons.length - 1; i >= 0; i--) {
+                const weapon = weapons[i];
+                const distance = player.position.distanceTo(weapon.position);
+                
+                if (distance < pickupThreshold) {
+                    // Pick up the weapon
+                    currentWeapon = weapon.type;
+                    console.log("Picked up " + weapon.type);
+                    
+                    // Show message to player
+                    const gameMessages = document.getElementById('gameMessages');
+                    gameMessages.textContent = "Picked up " + weapon.type.toUpperCase();
+                    gameMessages.style.display = 'block';
+                    
+                    // Hide message after 2 seconds
+                    setTimeout(() => {
+                        gameMessages.style.display = 'none';
+                    }, 2000);
+                    
+                    // Remove weapon from scene and array
+                    scene.remove(weapon);
+                    weapons.splice(i, 1);
+                }
+            }
+        }
+
+        // Player attack function
+        function playerAttack() {
+            if (currentWeapon === 'bat') {
+                // Melee attack - check for zombies in close range
+                const attackRange = 2;
+                let hitZombie = false;
+                
+                for (let i = zombies.length - 1; i >= 0; i--) {
+                    const zombie = zombies[i];
+                    const distance = player.position.distanceTo(zombie.position);
+                    
+                    if (distance < attackRange) {
+                        // Calculate attack direction (in front of player)
+                        const playerDirection = new THREE.Vector3(0, 0, -1);
+                        playerDirection.applyQuaternion(player.quaternion);
+                        
+                        // Calculate vector from player to zombie
+                        const toZombie = zombie.position.clone().sub(player.position).normalize();
+                        
+                        // Calculate dot product to check if zombie is in front of player
+                        const dotProduct = playerDirection.dot(toZombie);
+                        
+                        // If zombie is roughly in front of player (within ~90 degrees)
+                        if (dotProduct > 0) {
+                            damageZombie(zombie, 25);
+                            hitZombie = true;
+                        }
+                    }
+                }
+                
+                if (hitZombie) {
+                    console.log("Hit zombie with bat!");
+                }
+            } else if (currentWeapon === 'pistol') {
+                // Ranged attack - check for zombies in line of sight
+                const attackRange = 15;
+                
+                // Get player's forward direction
+                const playerDirection = new THREE.Vector3(0, 0, -1);
+                playerDirection.applyQuaternion(player.quaternion);
+                
+                // Find closest zombie in front of player
+                let closestZombie = null;
+                let closestDistance = attackRange;
+                
+                for (let zombie of zombies) {
+                    const distance = player.position.distanceTo(zombie.position);
+                    
+                    if (distance < closestDistance) {
+                        // Calculate vector from player to zombie
+                        const toZombie = zombie.position.clone().sub(player.position).normalize();
+                        
+                        // Calculate dot product to check if zombie is in front of player
+                        const dotProduct = playerDirection.dot(toZombie);
+                        
+                        // If zombie is roughly in front of player (within ~45 degrees)
+                        if (dotProduct > 0.7) {
+                            closestZombie = zombie;
+                            closestDistance = distance;
+                        }
+                    }
+                }
+                
+                if (closestZombie) {
+                    damageZombie(closestZombie, 50);
+                    console.log("Shot zombie with pistol!");
+                }
+            }
+        }
+
+        // Damage a zombie
+        function damageZombie(zombie, damage) {
+            zombie.health -= damage;
+            
+            // Flash the zombie red to indicate damage
+            const originalColor = zombie.material.color.clone();
+            zombie.material.color.set(0xFFFFFF);
+            
+            setTimeout(() => {
+                zombie.material.color.copy(originalColor);
+            }, 100);
+            
+            if (zombie.health <= 0) {
+                // Remove zombie from scene and array
+                scene.remove(zombie);
+                const index = zombies.indexOf(zombie);
+                if (index > -1) {
+                    zombies.splice(index, 1);
+                }
+                
+                // Check if all zombies are defeated
+                if (zombies.length === 0) {
+                    victory();
+                }
+            }
+        }
+
         // Create a zombie
         function createZombie() {
             const geometry = new THREE.BoxGeometry(1, 2, 1);
@@ -403,6 +596,23 @@
             // Show game over message
             const gameMessages = document.getElementById('gameMessages');
             gameMessages.textContent = "GAME OVER";
+            gameMessages.style.display = 'block';
+            
+            // Show start button again
+            setTimeout(() => {
+                document.getElementById('startButton').style.display = 'block';
+                gameMessages.style.display = 'none';
+            }, 2000);
+        }
+
+        // Victory function
+        function victory() {
+            console.log("Victory!");
+            gameRunning = false;
+            
+            // Show victory message
+            const gameMessages = document.getElementById('gameMessages');
+            gameMessages.textContent = "VICTORY!";
             gameMessages.style.display = 'block';
             
             // Show start button again
