@@ -75,6 +75,7 @@
         let gameRunning = false;
         let playerHealth = 100;
         let currentWeapon = 'none'; // Track player's current weapon
+        let mousePosition = new THREE.Vector2(); // Track mouse position
         
         // Initialize the game
         function init() {
@@ -134,16 +135,29 @@
                 keys[event.code] = false;
             });
             
+            // Track mouse position
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                // Calculate mouse position in normalized device coordinates (-1 to +1)
+                mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            });
+            
             // Add mouse click for attack
             renderer.domElement.addEventListener('click', (event) => {
                 if (currentWeapon !== 'none') {
+                    // Update mouse position on click to ensure accuracy
+                    mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
                     playerAttack();
                 }
             });
             
             // Add touch support for touchpads/touchscreens with passive: false
             renderer.domElement.addEventListener('touchstart', (event) => {
-                if (currentWeapon !== 'none') {
+                if (currentWeapon !== 'none' && event.touches.length > 0) {
+                    // Update touch position
+                    mousePosition.x = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
+                    mousePosition.y = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
                     playerAttack();
                     event.preventDefault(); // Prevent default touch behavior
                 }
@@ -454,7 +468,7 @@
                     console.log("Hit zombie with bat!");
                 }
             } else if (currentWeapon === 'pistol') {
-                // Create and fire a bullet
+                // Create and fire a bullet in the mouse direction
                 createBullet();
             }
         }
@@ -470,9 +484,8 @@
             bullet.position.copy(player.position);
             bullet.position.y = 1; // Bullet height
             
-            // Calculate bullet direction (player's forward direction)
-            const direction = new THREE.Vector3(0, 0, -1);
-            direction.applyQuaternion(player.quaternion);
+            // Calculate bullet direction based on mouse position
+            const direction = getMouseDirection();
             
             // Store direction and other properties on bullet
             bullet.direction = direction;
@@ -486,6 +499,32 @@
             bullets.push(bullet);
             
             return bullet;
+        }
+
+        // Get direction based on mouse position
+        function getMouseDirection() {
+            // Create a ray from the camera through the mouse position
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mousePosition, camera);
+            
+            // Create a plane at player's height to intersect with the ray
+            const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -player.position.y);
+            
+            // Find where the ray intersects the ground plane
+            const targetPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(groundPlane, targetPoint);
+            
+            // Calculate direction from player to intersection point
+            const direction = targetPoint.sub(player.position).normalize();
+            
+            // Make player face the target direction
+            if (currentWeapon === 'pistol') {
+                // Calculate angle to rotate player
+                const angle = Math.atan2(direction.x, direction.z);
+                player.rotation.y = angle;
+            }
+            
+            return direction;
         }
 
         // Update bullets positions and check for hits
