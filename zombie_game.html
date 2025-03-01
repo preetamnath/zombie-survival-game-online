@@ -252,13 +252,22 @@
 
         // Update zombies positions to move toward player
         function updateZombies() {
+            const detectionRadius = 30; // Zombies will only detect player within this distance
+            
             zombies.forEach(zombie => {
-                // Calculate direction vector from zombie to player
-                const direction = player.position.clone().sub(zombie.position).normalize();
+                // Calculate distance to player
+                const distanceToPlayer = zombie.position.distanceTo(player.position);
                 
-                // Move zombie toward player
-                zombie.position.x += direction.x * zombie.speed;
-                zombie.position.z += direction.z * zombie.speed;
+                // Only move toward player if within detection radius
+                if (distanceToPlayer <= detectionRadius) {
+                    // Calculate direction vector from zombie to player
+                    const direction = player.position.clone().sub(zombie.position).normalize();
+                    
+                    // Move zombie toward player
+                    zombie.position.x += direction.x * zombie.speed;
+                    zombie.position.z += direction.z * zombie.speed;
+                }
+                // Zombies outside detection radius remain stationary
             });
         }
 
