@@ -703,6 +703,12 @@
                     // Check for tree collisions before moving
                     if (!checkZombieTreeCollisions(newPosition)) {
                         zombie.position.copy(newPosition);
+                        
+                        // Update health bar position if it exists
+                        if (zombie.healthBar) {
+                            zombie.healthBar.position.copy(zombie.position);
+                            zombie.healthBar.position.y = 3; // Position above zombie
+                        }
                     }
                 }
                 // Zombies outside detection radius remain stationary
